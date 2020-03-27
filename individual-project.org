@@ -1,0 +1,406 @@
+#+title: Suicide, death and politics
+#+author: Louis James
+#+options: h:1 num:nil toc:nil \n:t
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \usepackage[margin=0.7in]{geometry}
+
+* Global death rates and causes
+** Import and read data :noexport:
+*** Setup and imports
+
+#+begin_src jupyter-python :session jupyter-python 
+# Imports
+import numpy as np
+import pandas as pd
+import matplotlib as mpl
+from matplotlib import cm
+import matplotlib.pyplot as plt
+from pandas.api.types import CategoricalDtype
+import seaborn as sns
+from scipy import stats
+#+end_src
+
+#+RESULTS:
+
+#+begin_src jupyter-python :session jupyter-python
+%matplotlib inline
+%config InlineBackend.figure_formats = set(['png']) # or png (and set dpi below)
+mpl.rcParams['figure.dpi'] = 110
+#+end_src
+
+ #+RESULTS:
+*** Read data
+    
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+df = pd.read_csv('../data/world-deaths/global-deaths.csv')
+print(df.head())
+#+end_src
+
+#+RESULTS:
+:RESULTS:
+# [goto error]
+#+begin_example
+
+  FileNotFoundErrorTraceback (most recent call last)
+  <ipython-input-132-bcfb7b163268> in <module>
+  ----> 1 df = pd.read_csv('../data/world-deaths/global-deaths.csv')
+        2 print(df.head())
+
+  ~/.virtualenvs/datavis/lib/python3.6/site-packages/pandas/io/parsers.py in parser_f(filepath_or_buffer, sep, delimiter, header, names, index_col, usecols, squeeze, prefix, mangle_dupe_cols, dtype, engine, converters, true_values, false_values, skipinitialspace, skiprows, skipfooter, nrows, na_values, keep_default_na, na_filter, verbose, skip_blank_lines, parse_dates, infer_datetime_format, keep_date_col, date_parser, dayfirst, cache_dates, iterator, chunksize, compression, thousands, decimal, lineterminator, quotechar, quoting, doublequote, escapechar, comment, encoding, dialect, error_bad_lines, warn_bad_lines, delim_whitespace, low_memory, memory_map, float_precision)
+      683         )
+      684 
+  --> 685         return _read(filepath_or_buffer, kwds)
+      686 
+      687     parser_f.__name__ = name
+
+  ~/.virtualenvs/datavis/lib/python3.6/site-packages/pandas/io/parsers.py in _read(filepath_or_buffer, kwds)
+      455 
+      456     # Create the parser.
+  --> 457     parser = TextFileReader(fp_or_buf, **kwds)
+      458 
+      459     if chunksize or iterator:
+
+  ~/.virtualenvs/datavis/lib/python3.6/site-packages/pandas/io/parsers.py in __init__(self, f, engine, **kwds)
+      893             self.options["has_index_names"] = kwds["has_index_names"]
+      894 
+  --> 895         self._make_engine(self.engine)
+      896 
+      897     def close(self):
+
+  ~/.virtualenvs/datavis/lib/python3.6/site-packages/pandas/io/parsers.py in _make_engine(self, engine)
+     1133     def _make_engine(self, engine="c"):
+     1134         if engine == "c":
+  -> 1135             self._engine = CParserWrapper(self.f, **self.options)
+     1136         else:
+     1137             if engine == "python":
+
+  ~/.virtualenvs/datavis/lib/python3.6/site-packages/pandas/io/parsers.py in __init__(self, src, **kwds)
+     1915         kwds["usecols"] = self.usecols
+     1916 
+  -> 1917         self._reader = parsers.TextReader(src, **kwds)
+     1918         self.unnamed_cols = self._reader.unnamed_cols
+     1919 
+
+  pandas/_libs/parsers.pyx in pandas._libs.parsers.TextReader.__cinit__()
+
+  pandas/_libs/parsers.pyx in pandas._libs.parsers.TextReader._setup_parser_source()
+
+  FileNotFoundError: [Errno 2] File b'../data/world-deaths/global-deaths.csv' does not exist: b'../data/world-deaths/global-deaths.csv'
+#+end_example
+:END:
+
+** visualisations
+*** Global mortality rate due to interpersonal violence and self harm :noexport:
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+df = pd.read_csv('../data/world-deaths/global-deaths.csv')
+df['year'] = df['year'].astype('str')
+df['year'] = pd.to_datetime(df['year'], format='%Y')
+df.set_index('year', inplace=True)
+df = df.to_period('D')
+df.set_index(['cause', 'metric'], inplace=True, append=True)
+df.sort_index(inplace=True)
+df = df.drop(columns=["sex", "location", "measure", "upper", "lower", "age"])
+ax = df.xs(['Rate', 'Interpersonal violence'], level=['metric', 'cause']).plot(grid=True)
+df.xs(['Rate', 'Self-harm'], level=['metric', 'cause']).plot(ax=ax, grid=True)
+#df.xs(['Rate', 'Cyclist road injuries'], level=['metric', 'cause']).plot(ax=ax, grid=True)
+ax.set_title("Global mortality rates due to Self-harm and interpersonal violence")
+ax.set_xlabel("Year")
+ax.set_ylabel("Death rate per 100k")
+ax.legend(["Interpersonal violence", "Self-harm", ])
+plt.figure()
+plt.show()
+#+end_src
+
+#+RESULTS:
+:RESULTS:
+[[file:./.ob-jupyter/8fba0f18306e5fd6c1b02479be59ca0626916847.png]]
+: <Figure size 660x440 with 0 Axes>
+:END:
+*** Government party 
+**** Definition of variable
+gov_party:
+Cabinet composition (Schmidt-Index): (1) hegemony of right-wing (and centre) par-
+ties (gov_left1=0), (2) dominance of right-wing (and centre) parties
+(0<gov_left1<=33.33), (3) balance of power between left and right
+(33.33<gov_left1<66.67), (4) dominance of social-democratic and other left parties
+(66.67<=gov_left1<100), (5) hegemony of social-democratic and other left parties
+(gov_left=100).
+Period covered: 1960-2017.
+Missing: Bulgaria 1993/94, Italy 2012, Romania 2015/16 (full technocratic govern-
+ments, Partisan caretaker governments).
+Source: Own calculations according to Schmidt (1992).
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+gov1 = pd.read_csv("../data/politics-and-death/uk-only-political-data-set.csv")
+gov1 = gov1[['year', 'gov_party']]
+gov1 = gov1[gov1['year'] > 1975]
+gov1['year'] = gov1['year'].astype('str')
+gov1['year'] = pd.to_datetime(gov1['year'], format='%Y')
+gov1.set_index('year', inplace=True )
+y = gov1['gov_party']
+cNorm = mpl.colors.Normalize(vmin=1, vmax=5)
+cmap = plt.get_cmap('twilight_shifted')
+ax = gov1.plot(grid=True, legend=False, colormap=cmap, linestyle='-') 
+ax.set_ylabel("Cabinet-composition ")
+ax.set_title("UK government composition from 1960 to 2017")
+plt.show()
+#+end_src
+
+#+RESULTS:
+[[file:./.ob-jupyter/3db86ea1cd7c94d7c288dcfb29759e482ddeb5db.png]]
+*** Deaths :noexport:
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+df = pd.read_csv('../data/politics-and-death/deaths-uk-all-causes.csv')
+df['year'] = df['year'].astype('str')
+df['year'] = pd.to_datetime(df['year'], format='%Y')
+df.set_index('year', inplace=True)
+df = df.to_period('D')
+df.set_index(['cause', 'metric'], inplace=True, append=True)
+df.sort_index(inplace=True)
+df = df.drop(columns=["sex", "location", "measure", "upper", "lower", "age"])
+ax = df.xs(['Rate', 'Self-harm'], level=['metric', 'cause']).plot(grid=True, )
+#print(df.xs(['Rate', 'Interpersonal violence'], level=['metric', 'cause']).head())
+df.xs(['Rate', 'Interpersonal violence'], level=['metric', 'cause']).plot(ax=ax, grid=True)
+#df.xs(['Rate', 'Cyclist road injuries'], level=['metric', 'cause']).plot(ax=ax, grid=True)
+ax2 = ax.twinx() 
+gov1.plot(ax=ax2, color="red", linestyle='-', legend=False) 
+ax.set_title("Global mortality rates due to Self-harm and interpersonal violence")
+ax.set_xlabel("Year")
+ax.set_ylabel("Death rate per 100k due to self harm")
+ax2.set_ylabel("\n UK cabinet composition\n 5.0==Labour Government,\n 1.0==Tory Government")
+ax.legend(["Self-harm", ])
+plt.figure()
+plt.show()
+#+end_src
+
+#+RESULTS:
+:RESULTS:
+[[file:./.ob-jupyter/4df3b60f8786ba35bfc21bef489b444e72bc100f.png]]
+: <Figure size 660x440 with 0 Axes>
+:END:
+*** Suicides in England and Wales since 1981
+ref: [[https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/datasets/suicidesintheunitedkingdomreferencetables][ons suicides uk]]
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+df = pd.read_csv('../data/politics-and-death/uk-suicide-from-1981.csv')
+#print(df['rate'].head())
+df = df[['year', 'rate']]
+df['year'] = df['year'].astype('str')
+df['year'] = pd.to_datetime(df['year'], format='%Y')
+df.set_index('year', inplace=True)
+df = df.to_period('D')
+df.sort_index(inplace=True)
+ax = df.plot(grid=True)
+ax2 = ax.twinx() 
+gov1.plot(ax=ax2, color="red", linestyle='-', legend=False) 
+ax.set_title("Suicide in England and Wales and the UK Government")
+ax.set_xlabel("Year")
+ax.set_ylabel("Age-standardised suicide rate (per 100k)")
+ax.axvline(x="1997-01-01", color='black', linestyle='dashed', linewidth=1)
+ax.annotate(' Blair becomes \n Prime Minister', xy=("1997-01-01", 13))
+ax.axvline(x="1979-01-01", color='black', linestyle='dashed', linewidth=1)
+ax.annotate('Thatcher becomes \n Prime Minister', xy=("1979-01-01", 12))
+ax2.set_ylabel("\n UK cabinet composition\n 5.0==Labour Government,\n 1.0==Tory Government")
+ax.legend(["Suicide Rate", ])
+plt.show()
+#+end_src
+
+#+RESULTS:
+[[file:./.ob-jupyter/8ea486d3a27c7e995b9b4fe45ea70daaf8fff59b.png]]
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+# Read data
+df0 = pd.read_csv("../data/politics-and-death/ex_suicidesbygender.csv")
+print(df0.head())
+
+#df = df[['year', 'rate']]
+df0['year'] = df0['year'].astype('str')
+df0['year'] = pd.to_datetime(df0['year'], format='%Y')
+df0.set_index('year', inplace=True)
+df0 = df0.to_period('D')
+df0.sort_index(inplace=True)
+ax = df0[['Males']].plot(grid=True)
+df0[['Females']].plot(ax=ax)
+df0[['Persons']].plot(ax=ax)
+ax.set_title("Suicide in England and Wales between 1981 and 2017")
+ax.set_xlabel("Year")
+ax.set_ylabel("Age-standardised suicide rate \n (per 100k)")
+plt.show()
+
+#+end_src
+
+#+RESULTS:
+:RESULTS:
+:    year  socex_t  Persons  Males  Females  gov_party
+: 0  1981    17.09     14.7   19.5     10.6          1
+: 1  1982    17.55     14.4   19.3     10.2          1
+: 2  1983    18.33     14.0   19.1      9.6          1
+: 3  1984    18.26     14.0   19.2      9.5          1
+: 4  1985    18.40     14.7   20.1      9.8          1
+[[file:./.ob-jupyter/133a0c801f9453693b6ecede85f5fc812d60891c.png]]
+:END:
+
+*** Social spending and government composition histograms
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+df0[['socex_t']].plot.hist()
+#print(df0[['socex_t']].describe())
+df0[['gov_party']].plot.hist()
+plt.show()
+#+end_src
+
+#+RESULTS:
+:RESULTS:
+[[file:./.ob-jupyter/eb842ba6673d891f704e5a9fd0a41da3508c921b.png]]
+[[file:./.ob-jupyter/0836d4990711854eab016a49f87c2e70011e6c84.png]]
+:END:
+
+*** Total public and mandatory private social expenditure as a percentage of GDP
+
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+social = pd.read_csv("../data/politics-and-death/uk-only-political-data-set.csv")
+social = social[['year', 'socexp_t_pmp']]
+social = social[social['year'] > 1981]
+social['year'] = social['year'].astype('str')
+social['year'] = pd.to_datetime(social['year'], format='%Y')
+social.set_index('year', inplace=True )
+y = social['socexp_t_pmp']
+cNorm = mpl.colors.Normalize(vmin=1, vmax=5)
+cmap = plt.get_cmap('twilight_shifted')
+ax = social.plot(grid=True, legend=False, colormap=cmap, linestyle='-') 
+ax.set_ylabel("Social expenditure as % of GDP")
+ax.set_title("Total social expenditure as a percentage of GDP\n from 1981 to 2017")
+plt.show()
+
+
+#+end_src
+
+#+RESULTS:
+[[file:./.ob-jupyter/bf4e8d125e906f6f80b477d921a5c2d03bbbab3d.png]]
+
+*** Social expenditure vs suicide
+**** Side by side
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+df = pd.read_csv('../data/politics-and-death/uk-suicide-from-1981.csv') 
+df = df[['year', 'rate']]
+df['year'] = df['year'].astype('str')
+df['year'] = pd.to_datetime(df['year'], format='%Y')
+df.set_index('year', inplace=True)
+df = df.to_period('D')
+df.sort_index(inplace=True)
+ax = df.plot(grid=True, color="red")
+ax2 = ax.twinx() 
+social.plot(ax=ax2, color="green", linestyle='-', legend=False) 
+ax.set_title("Suicide in England and Wales and the Social expenditure")
+ax.set_xlabel("Year")
+ax.set_ylabel("Suicide rate in England and Wales per 100k")
+ax.axvline(x="1997-01-01", color='black', linestyle='dashed', linewidth=1)
+ax.annotate(' Blair becomes \n Prime Minister', xy=("1997-01-01", 13))
+ax.axvline(x="1979-01-01", color='black', linestyle='dashed', linewidth=1)
+ax.annotate('Thatcher becomes \n Prime Minister', xy=("1979-01-01", 12))
+ax.axvline(x="2010-01-01", color='black', linestyle='dashed', linewidth=1)
+ax.annotate('Cameron becomes \n Prime Minister', xy=("2006-01-01", 12))
+ax2.set_ylabel("Total social expenditure as \n percentage og GDP")
+ax.legend(["Suicide Rate", ])
+plt.show()
+#+end_src
+
+#+RESULTS:
+[[file:./.ob-jupyter/710ccc3fdc7f3b13c2da499d2fda0888d9960727.png]]
+**** Correlation
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+df2 = pd.read_csv("../data/politics-and-death/ex_suicidesbygender.csv")
+#print(df2.head())
+df3 = df2[['socex_t', 'Persons']]
+ax = sns.regplot(x="socex_t", y="Persons", data=df3,
+# Set smaller dots.
+scatter_kws={'s': 10})
+#+end_src
+
+#+RESULTS:
+[[file:./.ob-jupyter/5d08cfd2857cd73f29cc55e749a88e97191a190f.png]]
+
+
+#+begin_src jupyter-python :session jupyter-python
+axes = pd.plotting.scatter_matrix(df3, alpha=0.5, diagonal='kde',
+figsize=(9, 6.5), range_padding=0.22)
+plt.show()
+
+#+end_src
+
+#+RESULTS:
+[[file:./.ob-jupyter/e73785c15b0b42a8f7ae7e2242485715b6f951af.png]]
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+slope, intercept, r_value, p_value, std_err = stats.linregress(df3['Persons'], df3['socex_t'])
+ax = df3.plot.scatter("Persons", "socex_t") 
+plt.plot(df3['Persons'], slope * df3['Persons'] + intercept, 'r')
+ax.set_title('Suicides and Social expenditure \nr = {:0.2f}'.format(r_value))
+ax.set_xlabel("Suicide rate in England and Wales per 100k")
+ax.set_ylabel("Total social expenditure % of GDP")
+plt.show()
+#+end_src
+
+#+RESULTS:
+[[file:./.ob-jupyter/edafedd8cfb56b7ab2df39f7e203f53c91e9253c.png]]
+*** suicides and government party :noexport:
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+slope, intercept, r_value, p_value, std_err = stats.linregress(df2['Persons'], df2['gov_party'])
+ax = df2.plot.scatter("Persons", "gov_party") 
+plt.plot(df2['Persons'], slope * df2['Persons'] + intercept, 'r')
+ax.set_title('Suicides and Government party\nr = {:0.2f}'.format(r_value))
+ax.set_xlabel("Suicide rate in England and Wales per 100k")
+ax.set_ylabel("Government party - Schmidtt index")
+plt.show()
+#+end_src
+
+#+RESULTS:
+[[file:./.ob-jupyter/0a4df2096b07f45401b51e77c824e9bae11fe778.png]]
+
+** Test :noexport:
+
+#+begin_src jupyter-python :session jupyter-python
+print("dskjfslkfjsdfkjsldkfjldkfjsldkfjlskdjflsdkjflsdkfjlksdjflskjdflksjdflksdjfshdkjfhdflkjshfs")
+#+end_src
+
+#+RESULTS:
+: dskjfslkfjsdfkjsldkfjldkfjsldkfjlskdjflsdkjflsdkfjlksdjflskjdflksjdflksdjfshdkjfhdflkjshfs
+
+** Idea: data on politics throughout history compared with deaths 
+
+https://cpds-data.org/index.php/data
+
+* Individual project write up:
+** Research Topic: 
+Is there a statistical relationship between the ideological position of the UK government and the number of deaths due to various causes?
+*** How influential is politics on deaths in the uk? Is it more affected by other factors (what?)?
+*** Politics and mortality rates.
+
+**** References??
+
+**** Important concepts??
+
+*** Data sets:
+**** https://www.cpds-data.org/index.php/data
+**** http://ghdx.healthdata.org/gbd-results-tool
+**** Format? data cleaning/preprocessing?
+
+
+* src block :noexport:
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+
+#+end_src
+
+#+RESULTS:
+* References
+
+
+https://academic.oup.com/ije/article/39/6/1464/736597#supplementary-data
+
+
+
+bibliographystyle:ieeetr
+bibliography:suicide-death-politics.bib

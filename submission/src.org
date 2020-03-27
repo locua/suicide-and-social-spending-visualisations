@@ -1,0 +1,308 @@
+#+title: Suicide and politics
+#+author: Louis James
+#+description: Data, Visualisation and the Web, Individual project
+#+date: 2019:12:10
+#+options: h:2 num:nil toc:nil \n:t
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+#+LATEX_HEADER: \usepackage[margin=0.6in]{geometry}
+
+* Setup and imports                                                :noexport:
+
+#+begin_src jupyter-python :session jupyter-python 
+# Imports
+import numpy as np
+import pandas as pd
+import matplotlib as mpl
+from matplotlib import cm
+import matplotlib.pyplot as plt
+from pandas.api.types import CategoricalDtype
+import seaborn as sns
+from scipy import stats
+#+end_src
+
+#+RESULTS:
+:RESULTS:
+# [goto error]
+: 
+: ImportErrorTraceback (most recent call last)
+: <ipython-input-17-6e14f915433f> in <module>()
+:       1 # Imports
+:       2 import numpy as np
+: ----> 3 import pandas as pd
+:       4 import matplotlib as mpl
+:       5 from matplotlib import cm
+: 
+: ImportError: No module named pandas
+:END:
+
+#+begin_src jupyter-python :session jupyter-python
+%matplotlib inline
+%config InlineBackend.figure_formats = set(['png']) # or png (and set dpi below)
+mpl.rcParams['figure.dpi'] = 100
+#+end_src
+
+#+RESULTS:
+
+#+begin_src jupyter-python :session jupyter-python
+df = pd.read_csv("../data/politics-and-death/main-merged-data.csv")
+# Convert 'year' variable to datetime format
+df['year'] = df['year'].astype('str')
+df['year'] = pd.to_datetime(df['year'], format='%Y')
+# Set 'year' as index
+df.set_index('year', inplace=True )
+df = df.to_period('D')
+df.sort_index(inplace=True)
+#+end_src
+
+#+RESULTS:
+:RESULTS:
+# [goto error]
+: 
+: NameErrorTraceback (most recent call last)
+: <ipython-input-15-ebad21c59879> in <module>()
+: ----> 1 df = pd.read_csv("../data/politics-and-death/main-merged-data.csv")
+:       2 # Convert 'year' variable to datetime format
+:       3 df['year'] = df['year'].astype('str')
+:       4 df['year'] = pd.to_datetime(df['year'], format='%Y')
+:       5 # Set 'year' as index
+: 
+: NameError: name 'pd' is not defined
+:END:
+ 
+* Research Topic: 
+
+/Is there a statistical relationship between government policy and suicide rates in the United kingdom?/
+
+In this project I decided to investigate whether there a statistical relationship between the policy decisions of the UK government and the number of deaths due to suicide.   With a politics of austerity on the [[https://www.ft.com/content/5fcbd0c4-2948-11e5-8db8-c033edba8a6e][rise]] in recent years and local services taking a big hit, I will attempt to demonstrate whether this kind of governance leads to a socio-economic atmosphere where extreme acts of self-harm are more likely to take place. Suicide is the most extreme example of self-harm usually in response to depression or other mental illness and so can reflect wider trends of mental distress in the population. Suicide rates have been on the decline since the 1930's cite:thomas10_suicid_englan_wales but there are still fluctuations in the rate and they look to have been on the [[https://www.theguardian.com/society/2018/sep/04/suicide-rate-rises-among-young-people-in-england-and-wales][rise again]] among young people cite:guardian_suicide_young. 
+
+I used this [[https://www.cpds-data.org/index.php/data][comparative political data]] set which has various statistics regarding the make up of governments around the world as well as figures on policy, such as spending in different areas. With this and a data set from the [[https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/datasets/suicidesintheunitedkingdomreferencetables][ons]] I aimed to assess whether there are any significant statistical relationships between government position and policy and suicide rate in the UK. In doing so I hope to demonstrate a statistical argument for the negative effects of cuts to social spending and to contribute evidence to this argument.
+
+** Important concepts:
+*** *Suicide*: Death due to intentional self-harm.
+*** A *government* is the system or group of people governing an organised community, often a state
+*** Gross domestic product (*GDP*), is a monetary measure of the market value of all the final goods and services produced in a specific time period, often annually.
+*** *Social expenditure* comprises cash benefits, direct in-kind provision of goods and services, and tax breaks with social purposes. Benefits may be targeted at low-income households, the elderly, disabled, sick, unemployed, or young persons.
+*** *Social Security Transfers* - Social assistance grants and welfare benefits paid by general government.
+* Data sets:
+I'm using two separately sourced data sets in this analysis. This [[https://www.cpds-data.org/index.php/data][comparative political data]] collated by researchers at the University of Zurich contains detailed information on party composition, reshuffles, duration, reason for termination and the type of government for 36 OECD (Organisation for Economic Co-operation and Development) and/or EU-member countries. The *Social Expenditure* variable was taken from the OECD;a National Accounts at a glance data set cite:oecdNationalAccounts .Alongside this I have used a [[https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/deaths/datasets/suicidesintheunitedkingdomreferencetables][dataset]] from the Office for National Statistics containing the number of suicides and suicide rates by sex and age in the UK from 1981 to 2018.
+
+Both sets contained many other tables or columns which were not relevant to this analysis so I copied out the relevant columns and stored them in a new file I set the year is a python "datetime" format and this was all that was necessary for the cleaning process. I should mention that ONS suicide set went up to 2018 while the political data set only up to 2017 so when it came to the correlative graphing I drop the /null/ values from the table.
+
+Tabulated data head:
+
+#+ATTR_LATEX: :mode table :caption 
+|       year | Persons | socex-t | Males | Females | gov-party | 10-24 | 25-44 | 45-64 | 65-74 | 75-and-over | sstran |
+| 1981-01-01 |    14.7 |   17.09 |  19.5 |    10.6 |         1 |   4.8 |  13.6 |  18.9 |  18.8 |        18.5 |  13.35 |
+| 1982-01-01 |    14.4 |   17.55 |  19.3 |    10.2 |         1 |   4.5 |  13.4 |  18.4 |  18.9 |        18.7 |  14.16 |
+| 1983-01-01 |    14.0 |   18.33 |  19.1 |     9.6 |         1 |   4.5 |  13.2 |  17.8 |  18.2 |        18.3 |  14.10 |
+| 1984-01-01 |    14.0 |   18.26 |  19.2 |     9.5 |         1 |   4.6 |  13.4 |  17.9 |  17.4 |        18.2 |  14.12 |
+| 1985-01-01 |    14.7 |   18.40 |  20.1 |     9.8 |         1 |   5.3 |  13.8 |  18.6 |  18.9 |        18.7 |  14.09 |
+
+* Exploratory and explanatory data visualisation 
+Variables of interest in this visual analysis included the *age-standardised suicide rates* (calculated per 100,000 population, standardised to the 2013 European Standard Population). The age-standardised rate is used to allow comparison between populations which may contain different proportions of people of different ages. The set contained different rates for males and females as well as for different age categories.
+
+The other two variables I used was [[https://www.cpds-data.org/images/Update2019/Codebook-CPDS-1960-2017-Update-2019.pdf][*socexp_t*]] (Total public and mandatory private social expenditure as a percentage of GDP) and [[https://www.cpds-data.org/images/Update2019/Codebook-CPDS-1960-2017-Update-2019.pdf][*gov_party*]] (follow link for detailed explanation), which is a measure of the ideological composition of the cabinet (Schmidt Index). Although this variable only really fluctuated between being 1 or 5 (the Tory party in office or the Labour Party) with two transitionary exceptions (1997 and 2010). I also used [[https://www.cpds-data.org/images/Update2019/Codebook-CPDS-1960-2017-Update-2019.pdf][*sstran*]] in one visualisation which is Social security transfers as a percentage of GDP. This variable refers to social assistance grants and welfare benefits paid by general government (benefits for sickness, old-age, family allowances, etc.).
+
+The two main variables *Social Expenditure* and *Suicide Rate* as well as *Social security transfers* are both numeric (ratio) variable types. *sstran* and *socex_t_pmp* are both percentages of GDP. The other essential variable in this analysis is *year* which used in the time series visualisations and as an index for all the variables. This is an interval variable type, simple subtraction and addition can be carried out on this variable but there isn't a mathematical definition of zero.
+
+** Government party 
+
+Here you can see two major governmental shifts: Tony Blair from the Labour party becoming prime minister in 1997 as well as David Cameron for the Conservative Party going into coalition with the Liberal Democrats in 2010. 
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+gov = df['gov_party']
+ax = gov.plot(grid=True, legend=False, ) 
+ax.set_ylabel("Cabinet Composition,\n 1 is a hegemony of right-ring parties,\n 5 is a hegemony left wing")
+ax.set_title("UK government composition from 1981 to 2017")
+ax.axvline(x="1997-01-01", color='black', linestyle='dashed', linewidth=1)
+ax.annotate(' Blair becomes \n Prime Minister', xy=("1997-01-01", 3.5))
+ax.axvline(x="2010-01-01", color='black', linestyle='dashed', linewidth=1)
+ax.annotate('Cameron becomes \n Prime Minister', xy=("2010-01-01", 2.5))
+plt.show()
+
+#+end_src
+
+#+ATTR_LATEX: :width 13cm :center t
+#+RESULTS:
+[[file:./.ob-jupyter/aba2ea55941ea3d21fa18eb4d2942c53a2d3bcf8.png]]
+
+The histogram below shows the distribution of the two parties in the 1981 to 2017 period which was dominated by the Conservative Party.
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+df['gov_party'] = df['gov_party'].astype(int)
+ax = df['gov_party'].plot.hist(align="mid")
+ax.set_title("Frequency of different cabinet composition in the 1981 to 2018 period")
+ax.set_xlabel("Cabinet Composition, 1 is a hegemony of right-ring parties,\n 5 is a hegemony left wing")
+plt.show()
+#+end_src
+
+#+ATTR_LATEX: :width 10cm 
+#+RESULTS:
+[[file:./.ob-jupyter/feb52ccbcb16121aaa27943b2fc9d8dab4a05045.png]]
+** Social spending
+
+Here you can see the total social expenditure as well as the Social security transfers (as a percentage of GDP) which is some of that Total Social expenditure. Social security transfers refers to Social  assistance  grants  and welfare benefits paid by general government (AKA benefits for sickness, old-age, family allowances, etc.).
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+ax = df['socex_t'].plot(grid=True, linestyle='-') 
+df['sstran'].plot(ax=ax, grid=True)
+ax.set_ylabel("Social expenditure as % of GDP")
+ax.set_title("Total social expenditure as a percentage of GDP\n from 1981 to 2017")
+ax.legend(["Total social spending", "Social security transfers"])
+plt.show()
+#+end_src
+
+#+ATTR_LATEX: :width 12cm 
+#+RESULTS:
+[[file:./.ob-jupyter/4be6e455e27631bc7b1a103a3b04151ff099b92f.png]]
+
+The histogram below again gives you an overview of the percentage of GDP spent on the social security transfers (sstran) and the total social expenditure over the 1981 to 2017 period.
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+ax = df[['socex_t']].plot.hist()
+df[['sstran']].plot.hist(ax=ax)
+ax.set_xlabel(" % of GDP")
+ax.set_ylabel("Number of years")
+plt.show()
+#+end_src
+
+#+ATTR_LATEX: :width 12cm 
+#+RESULTS:
+[[file:./.ob-jupyter/eb62dc25a7f991f51eb21e748bf14010112f9be5.png]]
+
+** Suicides
+Here are two time series graphs showing the rates of suicide by gender and age as well as for all persons. On the first graph you can see the difference between male and female suicide rates with both displaying an increase in the last few years.
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+# plot the Male rate and then add Female and the joint rate to the same axes object.
+ax = df[['Males']].plot(grid=True)
+df[['Females']].plot(ax=ax)
+df[['Persons']].plot(ax=ax)
+# Set title and labels
+ax.set_title("Suicide in England and Wales between 1981 and 2018,\n suicide rates for males, females and both")
+ax.set_xlabel("Year")
+ax.set_ylabel("Age-standardised suicide rate \n (per 100k)")
+plt.show()
+#+end_src
+
+
+#+ATTR_LATEX: :width 12cm 
+#+RESULTS:
+[[file:./.ob-jupyter/a677eecfe53c1b7b0c39f4231d39c16db7325f56.png]]
+
+In the second graph you can see suicide rates by age grouping. All the ages display an increase in the last couple of years with the youngest category (10-24) showing a marked increase over the last ten years. These graphs give an insight into rates amongst different ages, particularly striking is this increase amongst young people. This graph is quite busy with different variables but I used the default colour settings to allow for clear distinction between the different variables, it is possible that someone with red green colour blindness that someone may not be able to distinguish the two variables which are and red and green in this graph.
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+# Add all ages catergorized suicide rates to the same axes.
+ax = df[['10_24']].plot()
+df[['25_44']].plot(ax=ax)
+df[['45_64']].plot(ax=ax)
+df[['65_74']].plot(ax=ax)
+df[['75_and_over']].plot(ax=ax,grid=True)
+# Add title and labels
+ax.set_title("Suicide rate by age grouping the UK \nbetween 1981 and 2018")
+ax.set_xlabel("Year")
+ax.set_ylabel("Age-standardised suicide rate \n (per 100k)")
+plt.show()
+
+#+end_src
+
+#+ATTR_LATEX: :width 12cm 
+#+RESULTS:
+[[file:./.ob-jupyter/4d343858e13135cf073643f5522dbc8bc0001d6c.png]]
+** Multivariate: Suicide and spending
+
+Here are the two main variables side by side. Its hard to see if there is a strong relationship although there is a general upward shift in social spending and a general downwards trajectory of suicide rate. There are fluctuations in both lines some of which coincide with each other and some which don't. After this initial visual I thought there it would be useful to see some scatter plots of the two variables and to calculate the Pearson Correlation Coefficient. The line graphs here allow us to see the pattern of change over time of these two variables. I have annotated the graphs with the election of two Prime Ministers for political context.
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+ax = df['Persons'].plot(grid=True, color="red")
+ax2 = ax.twinx() 
+df['socex_t'].plot(ax=ax2, color="green", linestyle='-', legend=False) 
+ax.set_title("Suicide in England and Wales and Social expenditure")
+ax.set_xlabel("Year")
+ax.set_ylabel("Suicide rate in England and Wales per 100k")
+ax.axvline(x="1997-01-01", color='black', linestyle='dashed', linewidth=1)
+ax.annotate(' Blair becomes \n Prime Minister', xy=("1997-01-01", 13))
+ax.axvline(x="2010-01-01", color='black', linestyle='dashed', linewidth=1)
+ax.annotate('Cameron becomes \n Prime Minister', xy=("2006-01-01", 12))
+ax.legend(["Suicide Rate"])
+ax2.legend(["Social Expenditure"])
+ax.set_ylabel("Suicide rate")
+ax2.set_ylabel("Social Expenditure as % of GDP")
+plt.show()
+#+end_src
+
+#+ATTR_LATEX: :width 12cm :center t
+#+RESULTS:
+[[file:./.ob-jupyter/4ca1b6e2a58c30d26e9fdd5b9246cd37b4b1f46c.png]]
+
+Below is an initial scatter matrix with the suicides (both sexes) plotted against Social Expenditure. A general negative relationship is there which also appears to be have a slight curve to it (referring here to the scatter plots). The presence of this could be due to the influence of other historical social and economic factors and other less tangible cultural trends. The scatter plots and regression line below allow us to see visually if there is a strong relationship between the two variables as well as how well the line of best fit fits.
+
+#+ATTR_LATEX: :width 15cm
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+df2 = df[['socex_t', 'Persons']]
+ax = pd.plotting.scatter_matrix(df2, alpha=0.5, diagonal='hist',figsize=(9, 6.5), range_padding=0.22)
+plt.show()
+
+#+end_src
+
+#+RESULTS:
+[[file:./.ob-jupyter/f042d86f07d29b96d8601443cc80806efd8fc6de.png]]
+
+
+Here I plotted the suicides (both sexes) with a linear regression line. The correlation coefficient was -0.61 with suggests a moderate to strong correlation. I also plotted the graphs and calculated the coefficients of both sexes individually and obtained two more good correlations with a the Female being -0.49 and the Male being -0.68. I'm not sure how to interpret this difference. If I was to accept that there is a negative correlation and a causal link it could be that men are more affected by the reduction of social spending when it comes to suicide. However it may also be demonstrative of some sort of bias in the data caused one or more unknown variables. Overall I think historically related factors most likely add contextual noise to the sample which affect all these three relationships. I would not expect these is to be purely linear relationships and expect some potential bias from a plethora of factors. Suicide is a complex phenomena that no one thing causes, however motivation for this research comes from the likely strong influence this economic factor has on it.
+
+PERSONS with line of best fit in red:
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+df = df.dropna()
+slope, intercept, r_value, p_value, std_err = stats.linregress(df['Persons'], df['socex_t'])
+ax = df.plot.scatter("Persons", "socex_t") 
+plt.plot(df['Persons'], slope * df['Persons'] + intercept, 'r')
+ax.set_title('Suicides and Social expenditure \nr = {:0.2f}'.format(r_value))
+ax.set_xlabel("Suicide rate in England and Wales per 100k")
+ax.set_ylabel("Total social expenditure % of GDP")
+plt.show()
+#+end_src
+
+#+ATTR_LATEX: :width 12cm 
+#+RESULTS:
+[[file:./.ob-jupyter/edafedd8cfb56b7ab2df39f7e203f53c91e9253c.png]]
+
+MALES with line of best fit in red:
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+df = df.dropna()
+slope, intercept, r_value, p_value, std_err = stats.linregress(df['Males'], df['socex_t'])
+ax = df.plot.scatter("Males", "socex_t") 
+plt.plot(df['Males'], slope * df['Males'] + intercept, 'r')
+ax.set_title('Male suicides and Social expenditure \nr = {:0.2f}'.format(r_value))
+ax.set_xlabel("Male suicide rate in England and Wales per 100k")
+ax.set_ylabel("Total social expenditure % of GDP")
+plt.show()
+#+end_src
+
+#+ATTR_LATEX: :width 12cm 
+#+RESULTS:
+[[file:./.ob-jupyter/af39062f7227268ae0d513a96f3f9b7283f72059.png]]
+
+FEMALES with line of best fit in red:
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+
+slope1, intercept1, r_value1, p_value1, std_err1 = stats.linregress(df['Females'], df['socex_t'])
+ax = df.plot.scatter("Females", "socex_t") 
+plt.plot(df['Females'], slope1 * df['Females'] + intercept1, 'r')
+ax.set_title('Female suicides and Social expenditure \nr = {:0.2f}'.format(r_value1))
+ax.set_xlabel("Female suicide rate in England and Wales per 100k")
+ax.set_ylabel("Total social expenditure % of GDP")
+plt.show()
+#+end_src
+
+#+ATTR_LATEX: :width 12cm 
+#+RESULTS:
+[[file:./.ob-jupyter/ae87a746b642e4c226a01a0375794caf8c6ba39a.png]]
+
+* Conclusion and evaluation 
+
+I suspect there is a causal link between social expenditure and the rate of suicide, this was a [[http://www.psychchange.org/uploads/9/7/9/7/97971280/paa-briefing-paper.pdf][presupposed]] and has formed the basis for my analysis. The motivation for this work was to see if this link was statistically observable. I can't be certain that it is a major statistical cause but it makes sense considering the reliance on government investment by mental health support infrastructure with suicide rates illustrative of unhappiness and mental hardship. If I was to assume the correlative analysis is correct then above illustrations provide indisputable evidence of the detrimental affects cut-backs to social infrastructure have on the mental well-being of affected citizens. Furthermore they would be a poignant (and late) reminder of the deadly effects of the policies advocated by our newly elect [[https://en.wikipedia.org/wiki/2019_United_Kingdom_general_election][Conservative majority government]] in the UK (December 2019).
+
+In regards to the visualisation I feel these graphs were successful in allowing some deeper multivariate analysis of the relationship between two socio-economic phenomena. The initial graphs and histograms gave a broader picture of the data and political context with the line graphs conveying the variables over 1981 to 2017/18 period as well as the scatter plots which show their interaction together. 
+
+Further analysis would be needed for conclusive results; such as exploring the same relationship with more of the variables as well as different variables by using additional data sets. Compared to analysis with different countries I suspect the results would be varied as different political and socio-economic systems may present quite different relationships between the state and mental health although one would expect more investment in welfare systems would reduce the amount of suicide.
+
+bibliographystyle:ieeetr
+bibliography:suicide-death-politics.bib
+

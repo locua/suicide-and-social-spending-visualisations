@@ -1,0 +1,258 @@
+#+title: Suicide and politics code only
+#+author: Louis J
+
+* Setup and imports                                                :noexport:
+
+#+begin_src jupyter-python :session jupyter-python 
+# Imports
+import numpy as np
+import pandas as pd
+import matplotlib as mpl
+from matplotlib import cm
+import matplotlib.pyplot as plt
+from pandas.api.types import CategoricalDtype
+import seaborn as sns
+from scipy import stats
+#+end_src
+
+#+RESULTS:
+
+#+begin_src jupyter-python :session jupyter-python
+# Plot inline
+%matplotlib inline
+# Set set figure output format to png
+%config InlineBackend.figure_formats = set(['png']) # or png (and set dpi below)
+# Set dpi
+mpl.rcParams['figure.dpi'] = 100
+#+end_src
+
+#+RESULTS:
+
+#+begin_src jupyter-python :session jupyter-python
+# Read csv
+df = pd.read_csv("../data/politics-and-death/main-merged-data.csv")
+# Convert 'year' variable to datetime format
+df['year'] = df['year'].astype('str')
+df['year'] = pd.to_datetime(df['year'], format='%Y')
+# Set 'year' as index
+df.set_index('year', inplace=True )
+df = df.to_period('D')
+df.sort_index(inplace=True)
+#+end_src
+
+#+RESULTS:
+ 
+* Data set:
+#+begin_src jupyter-python :session jupyter-python
+df.head()
+#+end_src
+
+
+#+ATTR_LATEX: :mode table :caption 
+|       year | Persons | socex-t | Males | Females | gov-party | 10-24 | 25-44 | 45-64 | 65-74 | 75-and-over | sstran |
+| 1981-01-01 |    14.7 |   17.09 |  19.5 |    10.6 |         1 |   4.8 |  13.6 |  18.9 |  18.8 |        18.5 |  13.35 |
+| 1982-01-01 |    14.4 |   17.55 |  19.3 |    10.2 |         1 |   4.5 |  13.4 |  18.4 |  18.9 |        18.7 |  14.16 |
+| 1983-01-01 |    14.0 |   18.33 |  19.1 |     9.6 |         1 |   4.5 |  13.2 |  17.8 |  18.2 |        18.3 |  14.10 |
+| 1984-01-01 |    14.0 |   18.26 |  19.2 |     9.5 |         1 |   4.6 |  13.4 |  17.9 |  17.4 |        18.2 |  14.12 |
+| 1985-01-01 |    14.7 |   18.40 |  20.1 |     9.8 |         1 |   5.3 |  13.8 |  18.6 |  18.9 |        18.7 |  14.09 |
+
+* Exploratory and explanatory data visualisation 
+** Government party 
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+# Just use gov_party variable
+gov = df['gov_party']
+# Plot time series of this data
+ax = gov.plot(grid=True, legend=False, ) 
+# Set labels, title and annotations
+ax.set_ylabel("Cabinet Composition,\n 1 is a hegemony of right-ring parties,\n 5 is a hegemony left wing")
+ax.set_title("UK government compositions from 1981 to 2017")
+ax.axvline(x="1997-01-01", color='black', linestyle='dashed', linewidth=1)
+ax.annotate(' Blair becomes \n Prime Minister', xy=("1997-01-01", 3.5))
+ax.axvline(x="2010-01-01", color='black', linestyle='dashed', linewidth=1)
+ax.annotate('Cameron becomes \n Prime Minister', xy=("2010-01-01", 2.5))
+plt.show()
+
+#+end_src
+
+#+RESULTS:
+[[file:./.ob-jupyter/aba2ea55941ea3d21fa18eb4d2942c53a2d3bcf8.png]]
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+# cast to int 
+df['gov_party'] = df['gov_party'].astype(int)
+# Plot histogram
+ax = df['gov_party'].plot.hist(align="mid")
+# Title and label
+ax.set_title("Frequency of different cabinet composition in the 1981 to 2018 period")
+ax.set_xlabel("Cabinet Composition, 1 is a hegemony of right-ring parties,\n 5 is a hegemony left wing")
+plt.show()
+#+end_src
+
+#+RESULTS:
+[[file:./.ob-jupyter/feb52ccbcb16121aaa27943b2fc9d8dab4a05045.png]]
+** Social spending
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+# Plot social expenditure time series
+ax = df['socex_t'].plot(grid=True, linestyle='-') 
+# Add social security transfers to the same axes
+df['sstran'].plot(ax=ax, grid=True)
+# Set title, labels and legend
+ax.set_ylabel("Social expenditure as % of GDP")
+ax.set_title("Total social expenditure as a percentage of GDP\n from 1981 to 2017")
+ax.legend(["Total social spending", "Social security transfers"])
+plt.show()
+#+end_src
+
+#+RESULTS:
+[[file:./.ob-jupyter/4be6e455e27631bc7b1a103a3b04151ff099b92f.png]]
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+# Plot histograms of social security and total social expenditure on the same axes
+ax = df[['socex_t']].plot.hist()
+df[['sstran']].plot.hist(ax=ax)
+plt.show()
+#+end_src
+
+#+RESULTS:
+[[file:./.ob-jupyter/d8d45755c041122a68e73f470e27e439752a4b62.png]]
+
+** Suicides
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+# plot the Male rate and then add Female and the joint rate to the same axes object.
+ax = df[['Males']].plot(grid=True)
+df[['Females']].plot(ax=ax)
+df[['Persons']].plot(ax=ax)
+# Set title and labels
+ax.set_title("Suicide in England and Wales between 1981 and 2018,\n suicide rates for males, females and both")
+ax.set_xlabel("Year")
+ax.set_ylabel("Age-standardised suicide rate \n (per 100k)")
+plt.show()
+#+end_src
+
+
+#+RESULTS:
+[[file:./.ob-jupyter/a677eecfe53c1b7b0c39f4231d39c16db7325f56.png]]
+
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+# Add all ages catergorized suicide rates to the same axes.
+ax = df[['10_24']].plot()
+df[['25_44']].plot(ax=ax)
+df[['45_64']].plot(ax=ax)
+df[['65_74']].plot(ax=ax)
+df[['75_and_over']].plot(ax=ax,grid=True)
+# Add title and labels
+ax.set_title("Suicide rate by age grouping the UK \nbetween 1981 and 2018")
+ax.set_xlabel("Year")
+ax.set_ylabel("Age-standardised suicide rate \n (per 100k)")
+plt.show()
+
+#+end_src
+
+#+RESULTS:
+[[file:./.ob-jupyter/4d343858e13135cf073643f5522dbc8bc0001d6c.png]]
+** Multivariate: Suicide and spending
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+# Plot total suicides for both sexes
+ax = df['Persons'].plot(grid=True, color="red")
+# Initialise twin x two new axes object
+ax2 = ax.twinx() 
+# Plot total social expenditure on the other same axes different y axis
+df['socex_t'].plot(ax=ax2, color="green", linestyle='-', legend=False) 
+# Set title, label, annotations and legend
+ax.set_title("Suicide in England and Wales and the Social expenditure")
+ax.set_xlabel("Year")
+ax.set_ylabel("Suicide rate in England and Wales per 100k")
+ax.axvline(x="1997-01-01", color='black', linestyle='dashed', linewidth=1)
+ax.annotate(' Blair becomes \n Prime Minister', xy=("1997-01-01", 13))
+ax.axvline(x="2010-01-01", color='black', linestyle='dashed', linewidth=1)
+ax.annotate('Cameron becomes \n Prime Minister', xy=("2006-01-01", 12))
+ax.legend(["Suicide Rate"])
+ax2.legend(["Social Expenditure"])
+ax.set_ylabel("Social Expenditure as % of GDP")
+plt.show()
+
+#+end_src
+
+#+RESULTS:
+[[file:./.ob-jupyter/13df34bada375d2d7ae5e6334bd949d90c913239.png]]
+
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+# Plot scatter matrix for  social spending and suicides
+df2 = df[['socex_t', 'Persons']]
+ax = pd.plotting.scatter_matrix(df2, alpha=0.5, diagonal='kde',figsize=(9, 6.5), range_padding=0.22)
+plt.show()
+
+#+end_src
+
+#+RESULTS:
+[[file:./.ob-jupyter/058995e89bf988f079df2907fee03c6c79aee762.png]]
+
+
+
+PERSONS:
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+# Drop  null values
+df = df.dropna()
+# calculate regression line stats
+slope, intercept, r_value, p_value, std_err = stats.linregress(df['Persons'], df['socex_t'])
+# Plot scatter
+ax = df.plot.scatter("Persons", "socex_t") 
+# Plot regression line
+plt.plot(df['Persons'], slope * df['Persons'] + intercept, 'r')
+# Labels and annotations
+ax.set_title('Suicides and Social expenditure \nr = {:0.2f}'.format(r_value))
+ax.set_xlabel("Suicide rate in England and Wales per 100k")
+ax.set_ylabel("Total social expenditure % of GDP")
+plt.show()
+#+end_src
+
+#+RESULTS:
+[[file:./.ob-jupyter/edafedd8cfb56b7ab2df39f7e203f53c91e9253c.png]]
+
+MALES:
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+# Drop null values
+df = df.dropna()
+# calculate regression stats
+slope, intercept, r_value, p_value, std_err = stats.linregress(df['Males'], df['socex_t'])
+# Plot scatter plot
+ax = df.plot.scatter("Males", "socex_t") 
+# plot regression line to the same axed
+plt.plot(df['Males'], slope * df['Males'] + intercept, 'r')
+# Plot title and labels
+ax.set_title('Male suicides and Social expenditure \nr = {:0.2f}'.format(r_value))
+ax.set_xlabel("Male suicide rate in England and Wales per 100k")
+ax.set_ylabel("Total social expenditure % of GDP")
+plt.show()
+#+end_src
+
+#+ATTR_LATEX: :width 12cm 
+#+RESULTS:
+[[file:./.ob-jupyter/af39062f7227268ae0d513a96f3f9b7283f72059.png]]
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+# Calculate stats
+slope1, intercept1, r_value1, p_value1, std_err1 = stats.linregress(df['Females'], df['socex_t'])
+# plot scatter
+ax = df.plot.scatter("Females", "socex_t") 
+# plot regression line
+plt.plot(df['Females'], slope1 * df['Females'] + intercept1, 'r')
+# add labels and title
+ax.set_title('Female suicides and Social expenditure \nr = {:0.2f}'.format(r_value1))
+ax.set_xlabel("Female suicide rate in England and Wales per 100k")
+ax.set_ylabel("Total social expenditure % of GDP")
+plt.show()
+#+end_src
+
+#+RESULTS:
+[[file:./.ob-jupyter/ae87a746b642e4c226a01a0375794caf8c6ba39a.png]]
+
+
+
+

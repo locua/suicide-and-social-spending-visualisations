@@ -1,0 +1,202 @@
+* Global death rates and causes
+** Import and read data
+*** Setup and imports
+
+#+begin_src jupyter-python :session jupyter-python 
+# Imports
+import numpy as np
+import pandas as pd
+import matplotlib as mpl
+from matplotlib import cm
+import matplotlib.pyplot as plt
+from pandas.api.types import CategoricalDtype
+import seaborn as sns
+#+end_src
+
+#+RESULTS:
+
+#+begin_src jupyter-python :session jupyter-python
+%matplotlib inline
+%config InlineBackend.figure_formats = set(['png']) # or png (and set dpi below)
+mpl.rcParams['figure.dpi'] = 110
+#+end_src
+
+ #+RESULTS:
+*** Read data
+    
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+df = pd.read_csv('./data/world-deaths/global-deaths.csv')
+print(df.head())
+#+end_src
+
+#+RESULTS:
+:RESULTS:
+# [goto error]
+: 
+: ModuleNotFoundErrorTraceback (most recent call last)
+: <ipython-input-16-0ec7d240fa8b> in <module>()
+: ----> 1 import pandas as pd
+:       2 df = pd.read_csv('./data/world-deaths/global-deaths.csv')
+:       3 print(df.head())
+: 
+: ModuleNotFoundError: No module named 'pandas'
+:END:
+
+** visualisations
+*** Global mortality rate due to interpersonal violence and self harm
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+df = pd.read_csv('./data/world-deaths/global-deaths.csv')
+df['year'] = df['year'].astype('str')
+df['year'] = pd.to_datetime(df['year'], format='%Y')
+df.set_index('year', inplace=True)
+df = df.to_period('D')
+df.set_index(['cause', 'metric'], inplace=True, append=True)
+df.sort_index(inplace=True)
+df = df.drop(columns=["sex", "location", "measure", "upper", "lower", "age"])
+ax = df.xs(['Rate', 'Interpersonal violence'], level=['metric', 'cause']).plot(grid=True)
+df.xs(['Rate', 'Self-harm'], level=['metric', 'cause']).plot(ax=ax, grid=True)
+#df.xs(['Rate', 'Cyclist road injuries'], level=['metric', 'cause']).plot(ax=ax, grid=True)
+ax.set_title("Global mortality rates due to Self-harm and interpersonal violence")
+ax.set_xlabel("Year")
+ax.set_ylabel("Death rate per 100k")
+ax.legend(["Interpersonal violence", "Self-harm", ])
+plt.figure()
+plt.show()
+#+end_src
+
+#+RESULTS:
+:RESULTS:
+[[file:./.ob-jupyter/8fba0f18306e5fd6c1b02479be59ca0626916847.png]]
+: <Figure size 660x440 with 0 Axes>
+:END:
+*** Government party 
+**** Definition of variable
+***** gov_party:
+Cabinet composition (Schmidt-Index): (1) hegemony of right-wing (and centre) par-
+ties (gov_left1=0), (2) dominance of right-wing (and centre) parties
+(0<gov_left1<=33.33), (3) balance of power between left and right
+(33.33<gov_left1<66.67), (4) dominance of social-democratic and other left parties
+(66.67<=gov_left1<100), (5) hegemony of social-democratic and other left parties
+(gov_left=100).
+Period covered: 1960-2017.
+Missing: Bulgaria 1993/94, Italy 2012, Romania 2015/16 (full technocratic govern-
+ments, Partisan caretaker governments).
+Source: Own calculations according to Schmidt (1992).
+**** Visualisation
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+gov1 = pd.read_csv("data/politics-and-death/uk-only-political-data-set.csv")
+gov1 = gov1[['year', 'gov_party']]
+gov1 = gov1[gov1['year'] > 1981]
+gov1['year'] = gov1['year'].astype('str')
+gov1['year'] = pd.to_datetime(gov1['year'], format='%Y')
+gov1.set_index('year', inplace=True )
+y = gov1['gov_party']
+cNorm = mpl.colors.Normalize(vmin=1, vmax=5)
+cmap = plt.get_cmap('twilight_shifted')
+ax = gov1.plot(grid=True, legend=False, colormap=cmap, linestyle='-') 
+ax.set_ylabel("Cabinet-composition ")
+ax.set_title("UK government composition from 1960 to 2017")
+plt.show()
+#+end_src
+
+#+RESULTS:
+[[file:./.ob-jupyter/e03afdb8db974f84ec3abd7dd198ed5a6a846b8e.png]]
+*** UK Deaths
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+df = pd.read_csv('./data/politics-and-death/deaths-uk-all-causes.csv')
+df['year'] = df['year'].astype('str')
+df['year'] = pd.to_datetime(df['year'], format='%Y')
+df.set_index('year', inplace=True)
+df = df.to_period('D')
+df.set_index(['cause', 'metric'], inplace=True, append=True)
+df.sort_index(inplace=True)
+df = df.drop(columns=["sex", "location", "measure", "upper", "lower", "age"])
+ax = df.xs(['Rate', 'Self-harm'], level=['metric', 'cause']).plot(grid=True, )
+#print(df.xs(['Rate', 'Interpersonal violence'], level=['metric', 'cause']).head())
+#df.xs(['Rate', 'Interpersonal violence'], level=['metric', 'cause']).plot(ax=ax, grid=True)
+#df.xs(['Rate', 'Cyclist road injuries'], level=['metric', 'cause']).plot(ax=ax, grid=True)
+ax2 = ax.twinx() 
+gov1.plot(ax=ax2, color="red", linestyle='-', legend=False) 
+ax.set_title("Global mortality rates due to Self-harm and interpersonal violence")
+ax.set_xlabel("Year")
+ax.set_ylabel("Death rate per 100k due to self harm")
+ax2.set_ylabel("\n UK cabinet composition\n 5.0==Labour Government,\n 1.0==Tory Government")
+ax.legend(["Self-harm", ])
+plt.figure()
+plt.show()
+#+end_src
+
+#+RESULTS:
+:RESULTS:
+[[file:./.ob-jupyter/e25ea0d083bf4f4e421a5aa072fe59899b72299f.png]]
+: <Figure size 660x440 with 0 Axes>
+:END:
+*** UK deaths since 1981
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+df = pd.read_csv('./data/politics-and-death/uk-suicide-from-1981.csv')
+#print(df['rate'].head())
+df = df[['year', 'rate']]
+df['year'] = df['year'].astype('str')
+df['year'] = pd.to_datetime(df['year'], format='%Y')
+df.set_index('year', inplace=True)
+df = df.to_period('D')
+df.sort_index(inplace=True)
+ax = df.plot(grid=True)
+ax2 = ax.twinx() 
+gov1.plot(ax=ax2, color="red", linestyle='-', legend=False) 
+ax.set_title("Global mortality rates due to Self-harm and interpersonal violence")
+ax.set_xlabel("Year")
+ax.set_ylabel("Death rate per 100k due to self harm")
+ax2.set_ylabel("\n UK cabinet composition\n 5.0==Labour Government,\n 1.0==Tory Government")
+ax.legend(["Self-harm", ])
+plt.figure()
+plt.show()
+
+#+end_src
+
+#+RESULTS:
+:RESULTS:
+[[file:./.ob-jupyter/673df1b0b5a161cca339818901fc692c5e843d23.png]]
+: <Figure size 660x440 with 0 Axes>
+:END:
+
+** Test
+
+#+begin_src jupyter-python :session jupyter-python
+print("dskjfslkfjsdfkjsldkfjldkfjsldkfjlskdjflsdkjflsdkfjlksdjflskjdflksjdflksdjfshdkjfhdflkjshfs")
+#+end_src
+
+#+RESULTS:
+: dskjfslkfjsdfkjsldkfjldkfjsldkfjlskdjflsdkjflsdkfjlksdjflskjdflksjdflksdjfshdkjfhdflkjshfs
+
+
+** Idea: data on politics throughout history compared with deaths 
+
+https://cpds-data.org/index.php/data
+
+* Individual project write up:
+
+** Research Topic: What is the relationship between the ideological position of the Uk government and the number of deaths due to various causes in the Uk?
+*** How influential is politics on deaths in the uk? Is it more affected by other factors (what?)?
+*** Politics and mortality rates.
+
+**** References??
+
+**** Important concepts??
+
+*** Data sets:
+**** https://www.cpds-data.org/index.php/data
+**** http://ghdx.healthdata.org/gbd-results-tool
+**** Format? data cleaning/preprocessing?
+
+
+
+
+#+begin_src jupyter-python :session jupyter-python :exports results :results value
+
+#+end_src
+
+#+RESULTS:
